@@ -150,6 +150,7 @@ usage()
 	echo "Actions:"
 	for action in \
 		bridge		\
+		eiface		\
 		graph		\
 		show		\
 		show1		\
@@ -261,7 +262,33 @@ mustberoot_to_continue()
 	fi
 }
 
-jng_bridge_usage="bridge [-b BRIDGE_NAME] NAME [!|=]iface0 [[!|=]iface1 ...]"
+jng_eiface_usage="eiface NAME"
+jng_eiface_descr="Create a virtual interface (eiface) NAME for the host"
+jng_eiface()
+{
+	local eiface i=0 ri=255
+	local name="$1"
+	[ "${name:-x}" = "${name#*[!0-9a-zA-Z_]}" ] ||
+		action_usage eiface # NOTREACHED
+
+	# If the interface is already there, do nothing.
+	if ngctl msg "$name:" getifname > /dev/null 2>&1; then
+		return
+	fi
+
+	ngctl mkpeer eiface ether ether
+	eiface=$(ngctl list | sort -k 6 | grep ngeth | tail -n 1 |
+		awk '{print $2}')
+	i=${eiface##*[!0-9]}
+	ri=$(( $ri - $i ))
+	ifconfig "$eiface" ether
+		$(printf "02:00:%02x:%02x:%02x:%02x" $ri $i $ri $i)
+	ifconfig "$eiface" up
+	ngctl name "$eiface:" "$name"
+	ifconfig "$eiface" name "$name"
+}
+
+jng_bridge_usage="bridge [-b BRIDGE_NAME] NAME [!|=|@]iface0 [[!|=|@]iface1 ...]"
 jng_bridge_descr="Create ng0_NAME [ng1_NAME ...]"
 jng_bridge()
 {
@@ -283,15 +310,22 @@ jng_bridge()
 	mustberoot_to_continue
 
 	local iface parent eiface eiface_devid
-	local new clone_mac no_derive num quad i=0
+	local new clone_mac no_derive mk_virt num quad i=0
 	for iface in $*; do
 
 		clone_mac=
 		no_derive=
+		mk_virt=
 		case "$iface" in
 		=*) iface=${iface#=} clone_mac=1 ;;
 		!*) iface=${iface#!} no_derive=1 ;;
+		@*) iface=${iface#@} mk_virt=1 ;;
 		esac
+
+		# Create a virtual interface for the host
+		if [ "$mk_virt" ]; then
+			jng_eiface "$iface"
+		fi
 
 		# Make sure the interface doesn't exist already
 		eiface=ng${i}_$name
@@ -303,16 +337,33 @@ jng_bridge()
 		# Bring the interface up
 		ifconfig $iface up || return
 
+		local ether
+		local hostif=$(ngctl show "$iface:")
+		if echo $hostif | grep -q "Type: ether"; then
+			ether=1
+		elif echo $hostif | grep -q "Type: eiface"; then
+			ether=
+		else
+			echo "ifaceX must be a type of ether or eiface." >&2
+			exit $FAILURE
+		fi
+
 		# Set promiscuous mode and don't overwrite src addr
-		ngctl msg $iface: setpromisc 1 || return
-		ngctl msg $iface: setautosrc 0 || return
+		if [ "$ether" ]; then
+			ngctl msg $iface: setpromisc 1 || return
+			ngctl msg $iface: setautosrc 0 || return
+		fi
 
 		# Make sure the interface has been bridged
 		if ! ngctl info ${iface}bridge: > /dev/null 2>&1; then
-			ngctl mkpeer $iface: bridge lower link0 || return
-			ngctl connect $iface: $iface:lower upper link1 ||
-				return
-			ngctl name $iface:lower ${iface}bridge || return
+			if [ "$ether" ]; then
+				ngctl mkpeer $iface: bridge lower link0 || return
+				ngctl connect $iface: $iface:lower upper link1 || return
+				ngctl name $iface:lower ${iface}bridge || return
+			else
+				ngctl mkpeer $iface: bridge ether link0 || return
+				ngctl name $iface:ether ${iface}bridge || return
+			fi
 		fi
 
 		# Optionally create a secondary bridge
@@ -325,10 +376,13 @@ jng_bridge()
 			do
 				num=$(( $num + 1 ))
 			done
-			ngctl mkpeer $iface:lower bridge link$num link1 ||
-				return
-			ngctl name ${iface}bridge:link$num "$iface$bridge" ||
-				return
+			if [ "$ether" ]; then
+				ngctl mkpeer $iface:lower bridge link$num link1 || return
+				ngctl name ${iface}bridge:link$num "$iface$bridge" || return
+			else
+				ngctl mkpeer $iface:ether bridge link$num link1
+				ngctl name ${iface}bridge:link$num "$iface$bridge" || return
+			fi
 		fi
 
 		# Create a new interface to the bridge
