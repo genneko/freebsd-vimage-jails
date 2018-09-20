@@ -262,13 +262,25 @@ mustberoot_to_continue()
 	fi
 }
 
-jng_eiface_usage="eiface [-4 ip4addr] [-6 ip6addr] NAME"
-jng_eiface_descr="Create a virtual interface (eiface) NAME for the host"
+is_eiface_being_used()
+{
+	local name="$1"
+	[ "$name" ] &&
+		ngctl show \
+		$(ngctl show "$name:" 2>/dev/null |
+			awk '$1 == "ether"{print $2}'): 2>/dev/null |
+		awk '/Num hooks:/{ print $9 }' |
+		awk '$1 > 1{ ok=1 } END{ exit !ok }'
+}
+
+jng_eiface_usage="eiface [-d] [-4 ip4addr] [-6 ip6addr] NAME"
+jng_eiface_descr="Create/destroy virtual interface (eiface) NAME for the host"
 jng_eiface()
 {
-	local OPTIND=1 OPTARG ip4 ip6
-	while getopts '4:6:' flag; do
+	local OPTIND=1 OPTARG ip4 ip6 destroy
+	while getopts 'd4:6:' flag; do
 		case "$flag" in
+		d) destroy=1 ;;
 		4) ip4="$OPTARG"
 		   [ "$ip4" ] || action_usage eiface ;; # NOTREACHED
 		6) ip6="$OPTARG"
@@ -281,6 +293,17 @@ jng_eiface()
 	local name="$1"
 	[ "${name:-x}" = "${name#*[!0-9a-zA-Z_]}" ] ||
 		action_usage eiface # NOTREACHED
+
+	mustberoot_to_continue
+
+	if [ "$destroy" ]; then
+		if ngctl msg "$name:" getifname > /dev/null 2>&1; then
+			if ! is_eiface_being_used "$name"; then
+				ngctl shut "$name:"
+			fi
+		fi
+		return
+	fi
 
 	if ! ngctl msg "$name:" getifname > /dev/null 2>&1; then
 		local eiface i=0 ri=255
