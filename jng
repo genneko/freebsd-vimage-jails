@@ -296,14 +296,14 @@ jng_eiface()
 	fi
 
 	if [ "$ip4" ]; then
-		if ifconfig "$name" | grep -q "${ip4%%[!0-9.]*}"; then
-			ifconfig "$eiface" inet $ip4
+		if ! ifconfig "$name" | grep -q "${ip4%%[!0-9.]*}"; then
+			ifconfig "$name" inet $ip4
 		fi
 	fi
 
 	if [ "$ip6" ]; then
-		if ifconfig "$name" | grep -q "${ip6%%[!0-9a-f:]*}"; then
-			ifconfig "$eiface" inet6 $ip6
+		if ! ifconfig "$name" | grep -q "${ip6%%[!0-9a-f:]*}"; then
+			ifconfig "$name" inet6 $ip6
 		fi
 	fi
 }
