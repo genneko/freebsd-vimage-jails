@@ -1,3 +1,12 @@
+This repository is a record of my personal experiments on VIMAGE jails
+and netgraph modules with customized scripts which originally come with
+the FreeBSD source tree (share/examples/jails).
+
+My primary goal is modifying 'jng' script to support host-only virtual
+network configuration in combination with /etc/jail.conf.
+
+
+ORIGINAL CONTENT OF THIS FILE
 # $FreeBSD: releng/11.2/share/examples/jails/README 295542 2016-02-11 18:37:02Z dteske $
 
 The below 4 samples require a VIMAGE enabled kernel:
