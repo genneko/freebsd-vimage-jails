@@ -1,12 +1,75 @@
 This repository is a record of my personal experiments on VIMAGE jails
 and netgraph modules with customized scripts which originally come with
-the FreeBSD source tree (share/examples/jails).
+the FreeBSD source tree (in share/examples/jails).
 
 My primary goal is modifying 'jng' script to support host-only virtual
 network configuration in combination with /etc/jail.conf.
 
+After experimenting for a while, I decided to write a new script 'vnet'
+based on 'jng'.
+
+
+	[host]o---------[vi0br]
+	      vi0        | | |   vi0_h1
+                         | | +--------o (for jail [h1])
+                         | |
+                         | |     vi0_h2
+                         | +----------o (for jail [h2])
+                         |
+                         |       vi0_h3
+                         +------------o (for jail [h3])
+
+Using this script, the above network is created by running the follwing
+command.
+
+	vnet add vi0 vi0_h1 vi0_h2 vi0_h3
+
+The first argument of 'vnet add' is the name of a host interface which
+will be also used in a bridge name for the network by appending 'br'.
+
+The host interface can be a physical ethernet (type ether) or a virtual
+one (type eiface). If the specified host interface doesn't exist,
+a virtual interface with the name will be automatically created.
+
+Subsequent arguments are virtual intefaces for jails. They will be also
+automatically created.
+
+Actually, 'vnet add' can take -4 and -6 options which specify an IPv4
+ and IPv6 address/prefix length respectively.
+
+Using this script, /etc/jail.conf for VIMAGE jails can be something
+like below.
+
+
+exec.start = "/bin/sh /etc/rc";
+exec.stop = "/bin/sh /etc/rc.shutdown";
+exec.clean;
+mount.devfs;
+
+host.hostname = $name;
+path = "/vm/$name";
+exec.consolelog = "/var/log/jail_${name}_console.log";
+
+xxx {
+	$net = "vi0";
+	$gwv4 = "172.31.0.1";
+	$ipv4 = "172.31.0.11";
+	$plen = 24;
+
+	vnet;
+	vnet.interface = "${net}_$name";
+	exec.prestart += "vnet add -4 $gwv4/$plen $net ${net}_$name";
+	exec.start    += "ifconfig ${net}_$name $ipv4/$plen";
+	exec.start    += "route add default $gwv4";
+	exec.poststop += "vnet delete $net ${net}_$name";
+	mount.fstab = "/vm/${name}.fstab";
+}
+
+
+
 
 ORIGINAL CONTENT OF THIS FILE
+
 # $FreeBSD: releng/11.2/share/examples/jails/README 295542 2016-02-11 18:37:02Z dteske $
 
 The below 4 samples require a VIMAGE enabled kernel:
