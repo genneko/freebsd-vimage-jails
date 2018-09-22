@@ -161,6 +161,7 @@ usage()
 	for action in \
 		add		\
 		delete		\
+		eiface		\
 		list		\
 		graph		\
 		stats		\
@@ -281,7 +282,7 @@ is_eiface_being_used()
 		awk '$1 > 1{ ok=1 } END{ exit !ok }'
 }
 
-vnet_eiface_usage="eiface [-dD] [-4 ip4addr] [-6 ip6addr] NAME"
+vnet_eiface_usage="eiface [-dD] [-4 ip4] [-6 ip6] NAME"
 vnet_eiface_descr="Create/destroy virtual interface (eiface) NAME"
 vnet_eiface()
 {
