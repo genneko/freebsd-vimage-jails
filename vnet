@@ -272,6 +272,17 @@ mustberoot_to_continue()
 	fi
 }
 
+is_ether_being_used()
+{
+	local iface="$1"
+	[ "$iface" ] &&
+		ngctl show \
+		$(ngctl show "$iface:" 2>/dev/null |
+			awk '$1 == "upper"{print $2}'): 2>/dev/null |
+		awk '/Num hooks:/{ print $9 }' |
+		awk '$1 > 2{ ok=1 } END{ exit !ok }'
+}
+
 is_eiface_being_used()
 {
 	local iface="$1"
@@ -399,6 +410,8 @@ vnet_delete_descr="Delete iface0 ... and/or NETWORK_NAME"
 vnet_delete()
 {
 	local network="$1"
+	[ "${network:-x}" = "${network#*[!0-9a-zA-Z_]}" ] ||
+		action_usage delete # NOTREACHED
 	shift 1 # network
 
 	mustberoot_to_continue
@@ -415,8 +428,14 @@ vnet_delete()
 		fi
 	done # for iface
 
-	if [ "$(get_nodetype $network)" == "eiface" ]; then
+	local hostiftype=$(get_nodetype $network)
+	if [ "$hostiftype" == "eiface" ]; then
 		vnet_eiface -d $network
+	elif [ "$hostiftype" == "ether" ]; then
+		if ! is_ether_being_used $network; then
+			ngctl rmhook $network: lower || return
+			ngctl rmhook $network: upper || return
+		fi
 	fi
 }
 
