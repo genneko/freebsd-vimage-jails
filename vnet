@@ -274,17 +274,17 @@ mustberoot_to_continue()
 
 is_eiface_being_used()
 {
-	local name="$1"
-	[ "$name" ] &&
+	local iface="$1"
+	[ "$iface" ] &&
 		ngctl show \
-		$(ngctl show "$name:" 2>/dev/null |
+		$(ngctl show "$iface:" 2>/dev/null |
 			awk '$1 == "ether"{print $2}'): 2>/dev/null |
 		awk '/Num hooks:/{ print $9 }' |
 		awk '$1 > 1{ ok=1 } END{ exit !ok }'
 }
 
-vnet_eiface_usage="eiface [-dD] [-4 ip4] [-6 ip6] NAME"
-vnet_eiface_descr="Create/destroy virtual interface (eiface) NAME"
+vnet_eiface_usage="eiface [-dD] [-4 ip4] [-6 ip6] iface"
+vnet_eiface_descr="Create/destroy virtual interface (eiface) iface"
 vnet_eiface()
 {
 	local OPTIND=1 OPTARG ip4 ip6 destroy force
@@ -301,24 +301,24 @@ vnet_eiface()
 	done
 	shift $(( $OPTIND - 1 ))
 
-	local name="$1"
-	[ "${name:-x}" = "${name#*[!0-9a-zA-Z_]}" ] ||
+	local iface="$1"
+	[ "${iface:-x}" = "${iface#*[!0-9a-zA-Z_]}" ] ||
 		action_usage eiface # NOTREACHED
 
 	mustberoot_to_continue
 
 	if [ "$destroy" ]; then
-		local iftype=$(get_nodetype $name)
+		local iftype=$(get_nodetype $iface)
 		if [ "$iftype" == "eiface" ] &&
-			ngctl msg "$name:" getifname > /dev/null 2>&1; then
-			if ! is_eiface_being_used "$name" || [ "$force" ]; then
-				ngctl shut "$name:"
+			ngctl msg "$iface:" getifname > /dev/null 2>&1; then
+			if ! is_eiface_being_used "$iface" || [ "$force" ]; then
+				ngctl shut "$iface:"
 			fi
 		fi
 		return
 	fi
 
-	if ! ngctl msg "$name:" getifname > /dev/null 2>&1; then
+	if ! ngctl msg "$iface:" getifname > /dev/null 2>&1; then
 		local eiface i=0 ri=255
 		ngctl mkpeer eiface ether ether
 		eiface=$(ngctl list | sort -k 6 | grep ngeth | tail -n 1 | awk '{print $2}')
@@ -327,19 +327,19 @@ vnet_eiface()
 		ifconfig "$eiface" ether $(printf "02:00:%02x:%02x:%02x:%02x" $ri $i $ri $i)
 		ifconfig "$eiface" up
 
-		ngctl name "$eiface:" "$name"
-		ifconfig "$eiface" name "$name"
+		ngctl name "$eiface:" "$iface"
+		ifconfig "$eiface" name "$iface"
 	fi
 
 	if [ "$ip4" ]; then
-		if ! ifconfig "$name" | grep -q "${ip4%%[!0-9.]*}"; then
-			ifconfig "$name" inet $ip4
+		if ! ifconfig "$iface" | grep -q "${ip4%%[!0-9.]*}"; then
+			ifconfig "$iface" inet $ip4
 		fi
 	fi
 
 	if [ "$ip6" ]; then
-		if ! ifconfig "$name" | grep -q "${ip6%%[!0-9a-f:]*}"; then
-			ifconfig "$name" inet6 $ip6
+		if ! ifconfig "$iface" | grep -q "${ip6%%[!0-9a-f:]*}"; then
+			ifconfig "$iface" inet6 $ip6
 		fi
 	fi
 }
@@ -383,7 +383,7 @@ vnet_list()
 		if [ "$long" ]; then
 			ngctl show "${network}br:" 2>/dev/null
 		else
-			ngctl show "${network}br:" 2>/dev/null | awk '$1 ~ /link/ { print $2 }' | sort
+			ngctl show "${network}br:" 2>/dev/null | awk '$1 ~ /link/ { print $2 }' | sort | uniq
 		fi
 	else
 		if [ "$long" ]; then
@@ -557,11 +557,11 @@ vnet_stats()
 		esac
 	done
 	shift $(( $OPTIND -1 ))
-	local name="$1"
-	[ "${name:-x}" = "${name#*[!0-9a-zA-Z_]}" -a $# -eq 1 ] ||
+	local iface="$1"
+	[ "${iface:-x}" = "${iface#*[!0-9a-zA-Z_]}" -a $# -eq 1 ] ||
 		action_usage stats # NOTREACHED
 	mustberoot_to_continue
-	for eiface in $( vnet_list "$name" ); do
+	for eiface in $( vnet_list "$iface" ); do
 		echo "$eiface:"
 		ngctl show $eiface: | awk '
 		$3 == "bridge" && $5 ~ /^link/ {
