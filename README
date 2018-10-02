@@ -62,7 +62,6 @@ xxx {
 	exec.start    += "ifconfig ${net}_$name $ipv4/$plen";
 	exec.start    += "route add default $gwv4";
 	exec.poststop += "vnet delete $net ${net}_$name";
-	mount.fstab = "/vm/${name}.fstab";
 }
 
 
