@@ -165,6 +165,7 @@ usage()
 		list		\
 		graph		\
 		stats		\
+		table		\
 	; do
 		eval usage=\"\$vnet_${action}_usage\"
 		[ "$usage" ] || continue
@@ -576,6 +577,37 @@ vnet_stats()
 			}
 		' # END-QUOTE
 	done
+}
+
+vnet_table_usage="table NETWORK_NAME"
+vnet_table_descr="Show ng_bridge forwarding table for NETWORK_NAME."
+vnet_table()
+{
+	local network="$1"
+	[ "${network:-x}" = "${network#*[!0-9a-zA-Z_]}" ] ||
+		action_usage delete # NOTREACHED
+	shift 1 # network
+
+	mustberoot_to_continue
+
+	local bridge=${network}br
+
+	ngctl msg $bridge: gettable | tr '{' '\n' | awk '
+	$1 ~ /numHosts=/{
+		print $1;
+		printf("%17s  %4s  %4s  %4s\n", "Address", "Link", "Age", "Stale");
+	}
+	$1 ~ /addr=/{
+		if(! /linkNum=/){
+			$4 = $3; $3 = $2; $2 = "linkNum=0";
+		}
+		gsub(/addr=/, "");
+		gsub(/linkNum=/, "");
+		gsub(/age=/, "");
+		gsub(/staleness=/, "");
+		printf("%17s  %4d  %4d  %4d\n", $1, $2, $3, $4);
+	}
+	' # END-QUOTE
 }
 
 ############################################################ MAIN
