@@ -64,6 +64,9 @@ xxx {
 	exec.poststop += "vnet delete $net ${net}_$name";
 }
 
+For more details, please visit the following URL.
+https://genneko.github.io/playing-with-bsd/system/learning-notes-on-jails/#vnet-jails
+
 
 
 
