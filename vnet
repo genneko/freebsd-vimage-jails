@@ -439,13 +439,14 @@ vnet_delete()
 	fi
 }
 
-vnet_add_usage="add [-4 ip4] [-6 ip6] NETWORK_NAME [iface0 ...]"
+vnet_add_usage="add [-b] [-4 ip4] [-6 ip6] NETWORK_NAME [iface0 ...]"
 vnet_add_descr="Create and/or add iface0 ... to NETWORK_NAME"
 vnet_add()
 {
-	local OPTIND=1 OPTARG ip4 ip6 opts=
-	while getopts '4:6:' flag; do
+	local OPTIND=1 OPTARG bronly=0 ip4 ip6 hostif opts=
+	while getopts 'b4:6:' flag; do
 		case "$flag" in
+		b) bronly=1 ;;
 		4) opts="${opts}-4 $OPTARG " ;;
 		6) opts="${opts}-6 $OPTARG " ;;
 		*) action_usage add # NOTREACHED
@@ -460,17 +461,23 @@ vnet_add()
 
 	mustberoot_to_continue
 
-	local hostiftype=$(get_nodetype $network)
-	if [ ! "$hostiftype" -o "$hostiftype" == "eiface" ]; then
-		vnet_eiface $opts $network || return
-	elif [ "$hostiftype" != "ether" ]; then
-		echo "NETWORK_NAME must be a host interface of type ether or eiface." >&2
-		exit $FAILURE
+	if [ $bronly == 0 ]; then
+		local hostiftype=$(get_nodetype $network)
+		if [ ! "$hostiftype" -o "$hostiftype" == "eiface" ]; then
+			vnet_eiface $opts $network || return
+		elif [ "$hostiftype" != "ether" ]; then
+			echo "NETWORK_NAME must be a host interface of type ether or eiface." >&2
+			exit $FAILURE
+		fi
+		hostif="$network"
 	fi
 	local bridge=${network}br
 
 	local iface iftype num
-	for iface in $network $*; do
+	for iface in $hostif $*; do
+		if [ "${iface}" = "" ]; then
+			continue
+		fi
 
 		# Create a virtual interface
 		iftype=$(get_nodetype $iface)
