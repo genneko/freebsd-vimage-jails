@@ -475,9 +475,9 @@ vnet_list()
 				fi
 			done
 		elif [ "$long" -eq 1 ]; then
-			ngctl list 2>/dev/null | awk '$4 == "bridge" { print $0 }'
+			ngctl list 2>/dev/null | awk '$4 == "bridge" { print $0 }' | sort
 		else
-			ngctl list 2>/dev/null | awk '$4 == "bridge" { sub(/br$/, "", $2); print $2 }'
+			ngctl list 2>/dev/null | awk '$4 == "bridge" { sub(/br$/, "", $2); print $2 }' | sort
 		fi
 	fi
 }
