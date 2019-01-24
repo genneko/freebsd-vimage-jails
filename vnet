@@ -163,6 +163,7 @@ usage()
 		delete		\
 		eiface		\
 		list		\
+		list_jail	\
 		graph		\
 		stats		\
 		table		\
@@ -372,15 +373,57 @@ is_member()
 			grep -q $interface
 }
 
-vnet_list_usage="list [-l] [NETWORK_NAME]"
-vnet_list_descr="List interfaces in NETWORK_NAME or all networks"
-vnet_list()
+get_vif_jail_addr(){
+	local jail addr4 addr6
+	local interface="$1"
+	if [ "$interface" ]; then
+		jail=$(vnet_list_jail -l | grep $interface | cut -f1 -d:)
+		addr4=$(jexec $jail ifconfig -f inet:cidr $interface | fgrep "inet " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
+		addr6=$(jexec $jail ifconfig -f inet6:cidr $interface | fgrep "inet6 " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
+		echo "$jail $addr4 $addr6"
+	else
+		echo
+	fi
+}
+
+vnet_list_jail_usage="list_jail [-l]"
+vnet_list_jail_descr="List VNET jails (and their interfaces)."
+vnet_list_jail()
 {
-	local OPTIND=1 OPTARG long
+	local OPTIND=1 OPTARG long=0
 	while getopts 'l' flag; do
 		case "$flag" in
 		l) long=1 ;;
-		*) action_usage add # NOTREACHED
+		*) action_usage list_jail
+		esac
+	done
+	shift $(( $OPTIND - 1 ))
+
+	mustberoot_to_continue
+
+	for jail in $(jls -s vnet name | fgrep vnet=1 | sed 's/.*name=//'); do
+		echo -n "$jail"
+		if [ "$long" -eq 1 ]; then
+			echo -n ": $(jexec $jail ifconfig -l)"
+		fi
+		echo
+	done
+}
+
+vnet_list_usage="list [-lr] [NETWORK_NAME]"
+vnet_list_descr="Lists various objects in VNET world.
+		vnet list [-l] - lists networks
+		vnet list [-l] NETWORK_NAME - lists interfaces in the network
+		vnet list -r [-l] [NETWORK_NAME] - recursively lists networks,
+					jails, interfaces and addresses"
+vnet_list()
+{
+	local OPTIND=1 OPTARG long=0 recursive=0 vnet vif buf jail addrs addr4 addr6
+	while getopts 'lr' flag; do
+		case "$flag" in
+		l) long=1 ;;
+		r) recursive=1 ;;
+		*) action_usage list
 		esac
 	done
 	shift $(( $OPTIND - 1 ))
@@ -391,13 +434,42 @@ vnet_list()
 	mustberoot_to_continue
 
 	if [ "$network" ]; then
-		if [ "$long" ]; then
+		if [ "$recursive" -eq 1 ]; then
+			echo $network
+			for vif in $(vnet_list $network); do
+				buf=$(get_vif_jail_addr $vif)
+				jail=${buf%% *}
+				addrs=${buf#* }
+				addr4=${addrs%% *}
+				addr6=${addrs##* }
+				if [ "$long" -eq 1 ]; then
+					echo "  ${jail:-N/A}"
+					echo "    $vif"
+					[ "$addr4" ] && echo "      $addr4" | sed 's/,/, /g'
+					[ "$addr6" ] && echo "      $addr6" | sed 's/,/, /g'
+				else
+					echo -n "  ${jail:-N/A}"
+					echo -n " $vif"
+					[ "$addr4" ] && echo -n " $addr4" | sed 's/,/, /g'
+					[ "$addr6" ] && echo -n " $addr6" | sed 's/,/, /g'
+					echo
+				fi
+			done
+		elif [ "$long" -eq 1 ]; then
 			ngctl show "${network}br:" 2>/dev/null
 		else
 			ngctl show "${network}br:" 2>/dev/null | awk '$1 ~ /link/ { print $2 }' | sort | uniq
 		fi
 	else
-		if [ "$long" ]; then
+		if [ "$recursive" -eq 1 ]; then
+			for vnet in $(vnet_list); do
+				if [ "$long" -eq 1 ]; then
+					vnet_list -rl $vnet
+				else
+					vnet_list -r $vnet
+				fi
+			done
+		elif [ "$long" -eq 1 ]; then
 			ngctl list 2>/dev/null | awk '$4 == "bridge" { print $0 }'
 		else
 			ngctl list 2>/dev/null | awk '$4 == "bridge" { sub(/br$/, "", $2); print $2 }'
@@ -440,7 +512,14 @@ vnet_delete()
 }
 
 vnet_add_usage="add [-b] [-4 ip4] [-6 ip6] NETWORK_NAME [iface0 ...]"
-vnet_add_descr="Create and/or add iface0 ... to NETWORK_NAME"
+vnet_add_descr="Create and/or add iface0 ... to the network.
+		The network will be also created if it doesn't exist.
+		Note that 'network' here means a ng_bridge which is named
+		'{NETWORK_NAME}br'.
+		An interface for the host is also created with the name
+		'{NETWORK_NAME}' unless -b option is specified.
+		IPv4/IPv6 address can be assigned to the host interface
+		using -4 and -6 options."
 vnet_add()
 {
 	local OPTIND=1 OPTARG bronly=0 ip4 ip6 hostif opts=
@@ -611,7 +690,7 @@ vnet_table()
 {
 	local network="$1"
 	[ "${network:-x}" = "${network#*[!0-9a-zA-Z_]}" ] ||
-		action_usage delete # NOTREACHED
+		action_usage table # NOTREACHED
 	shift 1 # network
 
 	mustberoot_to_continue
