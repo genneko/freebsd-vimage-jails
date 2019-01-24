@@ -377,9 +377,14 @@ get_vif_jail_addr(){
 	local jail addr4 addr6
 	local interface="$1"
 	if [ "$interface" ]; then
-		jail=$(vnet_list_jail -l | grep $interface | cut -f1 -d:)
-		addr4=$(jexec $jail ifconfig -f inet:cidr $interface | fgrep "inet " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
-		addr6=$(jexec $jail ifconfig -f inet6:cidr $interface | fgrep "inet6 " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
+		jail=$(vnet_list_jail -l | grep -w $interface | cut -f1 -d:)
+		if [ "$jail" ]; then
+			addr4=$(jexec $jail ifconfig -f inet:cidr $interface | fgrep "inet " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
+			addr6=$(jexec $jail ifconfig -f inet6:cidr $interface | fgrep "inet6 " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
+		else
+			addr4=$(ifconfig -f inet:cidr $interface | fgrep "inet " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
+			addr6=$(ifconfig -f inet6:cidr $interface | fgrep "inet6 " | cut -f3 -w | tr '\n' ',' | sed 's/,$//')
+		fi
 		echo "$jail $addr4 $addr6"
 	else
 		echo
@@ -443,12 +448,12 @@ vnet_list()
 				addr4=${addrs%% *}
 				addr6=${addrs##* }
 				if [ "$long" -eq 1 ]; then
-					echo "  ${jail:-N/A}"
+					echo "  ${jail:-$(hostname -s)(HOST)}"
 					echo "    $vif"
 					[ "$addr4" ] && echo "      $addr4" | sed 's/,/, /g'
 					[ "$addr6" ] && echo "      $addr6" | sed 's/,/, /g'
 				else
-					echo -n "  ${jail:-N/A}"
+					echo -n "  ${jail:-$(hostname -s)(HOST)}"
 					echo -n " $vif"
 					[ "$addr4" ] && echo -n " $addr4" | sed 's/,/, /g'
 					[ "$addr6" ] && echo -n " $addr6" | sed 's/,/, /g'
