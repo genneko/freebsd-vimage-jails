@@ -370,7 +370,7 @@ is_member()
 	[ "$network" -a "$interface" ] &&
 		ngctl show $network: 2> /dev/null |
 			awk '$1 ~ /link/ { print $2 }' |
-			grep -q $interface
+			grep -qw $interface
 }
 
 get_vif_jail_addr(){
