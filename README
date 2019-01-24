@@ -8,7 +8,9 @@ network configuration in combination with /etc/jail.conf.
 After experimenting for a while, I decided to write a new script 'vnet'
 based on 'jng'.
 
-
+	  |
+	  | external I/F
+	  o
 	[host]o---------[vi0br]
 	      vi0        | | |   vi0_h1
                          | | +--------o (for jail [h1])
@@ -38,8 +40,8 @@ Actually, 'vnet add' can take -4 and -6 options which specify an IPv4
  and IPv6 address/prefix length respectively.
 
 Using this script, /etc/jail.conf for VIMAGE jails can be something
-like below.
-
+like below. Of course, you can enable IP forwarding and NAT on the host
+to allow the jails to go out to the Internet.
 
 exec.start = "/bin/sh /etc/rc";
 exec.stop = "/bin/sh /etc/rc.shutdown";
@@ -64,7 +66,36 @@ xxx {
 	exec.poststop += "vnet delete $net ${net}_$name";
 }
 
-For more details, please visit the following URL.
+
+You can also create a network without any connection to the host,
+thus outside world.
+
+	  |
+	  | external I/F
+	  o
+	[host]          [vi0br]
+	                 | | |   vi0_h1
+                         | | +--------o (for jail [h1])
+                         | |
+                         | |     vi0_h2
+                         | +----------o (for jail [h2])
+                         |
+                         |       vi0_h3
+                         +------------o (for jail [h3])
+
+This can be done with -b (bridge only) option to vnet add.
+
+	vnet add -b vi0 vi0_h1 vi0_h2 vi0_h3
+
+
+Please note that the vnet script is intended only for creating
+and connecting interfaces and bridges for use with VNET jails.
+
+Use /etc/jail.conf for assigning interfaces to jails, setting IP
+address on the interfaces and so on.
+
+
+For more configurations and details, please visit the following URL.
 https://genneko.github.io/playing-with-bsd/system/learning-notes-on-jails/#vnet-jails
 
 
