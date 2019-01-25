@@ -273,15 +273,30 @@ mustberoot_to_continue()
 	fi
 }
 
+get_ether_bridge()
+{
+	local iface="$1"
+	[ "$iface" ] &&
+		ngctl show "$iface:" 2>/dev/null |
+			awk '$1 == "upper"{print $2}'
+}
+
 is_ether_being_used()
 {
 	local iface="$1"
 	[ "$iface" ] &&
 		ngctl show \
-		$(ngctl show "$iface:" 2>/dev/null |
-			awk '$1 == "upper"{print $2}'): 2>/dev/null |
+		$(get_ether_bridge $iface): 2>/dev/null |
 		awk '/Num hooks:/{ print $9 }' |
 		awk '$1 > 2{ ok=1 } END{ exit !ok }'
+}
+
+get_eiface_bridge()
+{
+	local iface="$1"
+	[ "$iface" ] &&
+		ngctl show "$iface:" 2>/dev/null |
+			awk '$1 == "ether"{print $2}'
 }
 
 is_eiface_being_used()
@@ -289,8 +304,7 @@ is_eiface_being_used()
 	local iface="$1"
 	[ "$iface" ] &&
 		ngctl show \
-		$(ngctl show "$iface:" 2>/dev/null |
-			awk '$1 == "ether"{print $2}'): 2>/dev/null |
+		$(get_eiface_bridge $iface): 2>/dev/null |
 		awk '/Num hooks:/{ print $9 }' |
 		awk '$1 > 1{ ok=1 } END{ exit !ok }'
 }
