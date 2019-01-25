@@ -363,12 +363,27 @@ get_nodetype()
 			awk '$1 == "Name:" && $3 == "Type:" { print $4 }'
 }
 
+get_nextlink()
+{
+	local bridge="$1"
+	local num=${2:-0}
+	if ngctl info $bridge: > /dev/null 2>&1; then
+		while ngctl msg $bridge: getstats $num > /dev/null 2>&1
+		do
+			num=$(( $num + 1 ))
+		done
+	else
+		num=-1
+	fi
+	echo $num
+}
+
 is_member()
 {
-	local network="$1"
+	local bridge="$1"
 	local interface="$2"
-	[ "$network" -a "$interface" ] &&
-		ngctl show $network: 2> /dev/null |
+	[ "$bridge" -a "$interface" ] &&
+		ngctl show $bridge: 2> /dev/null |
 			awk '$1 ~ /link/ { print $2 }' |
 			grep -qw $interface
 }
@@ -592,18 +607,11 @@ vnet_add()
 		# If the network bridge exists, just connect the interface.
 		if ngctl info $bridge: > /dev/null 2>&1; then
 			if ! is_member $bridge $iface; then
-				num=0
-				while ngctl msg $bridge: getstats $num > /dev/null 2>&1
-				do
-					num=$(( $num + 1 ))
-				done
+				num=$(get_nextlink $bridge)
 				if [ "$ether" ]; then
 					ngctl connect $bridge: $iface: link$num lower || return
 					num=$(( $num + 1 ))
-					while ngctl msg $bridge: getstats $num > /dev/null 2>&1
-					do
-						num=$(( $num + 1 ))
-					done
+					num=$(get_nextlink $bridge $num)
 					ngctl connect $bridge: $iface: link$num upper || return
 				else
 					ngctl connect $bridge: $iface: link$num ether || return
