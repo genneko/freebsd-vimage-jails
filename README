@@ -2,18 +2,18 @@ This repository is a record of my personal experiments on VIMAGE jails
 and netgraph modules with customized scripts which originally come with
 the FreeBSD source tree (in share/examples/jails).
 
-My primary goal is modifying 'jng' script to support host-only virtual
-network configuration in combination with /etc/jail.conf.
+My primary goal is modifying 'jng' script to support internal virtual
+network (host-only or routed topology) in combination with /etc/jail.conf.
 
 After experimenting for a while, I decided to write a new script 'vnet'
 based on 'jng'.
 
 	  |
 	  | external I/F
-	  o
+	  o                virtual bridge (switch)
 	[host]o---------[vi0br]
 	      vi0        | | |   vi0_h1
-                         | | +--------o (for jail [h1])
+            internal I/F | | +--------o (for jail [h1])
                          | |
                          | |     vi0_h2
                          | +----------o (for jail [h2])
@@ -72,7 +72,7 @@ thus outside world.
 
 	  |
 	  | external I/F
-	  o
+	  o                virtual bridge (switch)
 	[host]          [vi0br]
 	                 | | |   vi0_h1
                          | | +--------o (for jail [h1])
