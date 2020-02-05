@@ -745,6 +745,20 @@ vnet_table()
 ############################################################ MAIN
 
 #
+# Load ng_ether (if not loaded yet)
+#
+# Excerpts from ng_ether(4):
+# BUGS
+#      The automatic KLD module loading mechanism that works for most other
+#      Netgraph node types does not work for the ether node type, because ether
+#      nodes are not created on demand; instead, they are created when Ethernet
+#      interfaces are attached or when the KLD is first loaded.  Therefore, if
+#      the KLD is not statically compiled into the kernel, it is necessary to
+#      load the KLD manually in order to bring the ether nodes into existence.
+#
+kldload -n ng_ether
+
+#
 # Command-line arguments
 #
 action="$1"
