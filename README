@@ -95,7 +95,8 @@ Use /etc/jail.conf for assigning interfaces to jails, setting IP
 address on the interfaces and so on.
 
 
-For more configurations and details, please visit the following URL.
+For more configurations and details, please look at jail.vnet.*.conf
+in this repository and/or visit the following URL.
 https://genneko.github.io/playing-with-bsd/system/learning-notes-on-jails/#vnet-jails
 
 
