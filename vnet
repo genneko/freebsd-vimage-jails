@@ -182,7 +182,7 @@ action_usage()
 	eval usage=\"\$vnet_${action}_usage\"
 	echo "Usage: $pgm $usage" >&2
 	eval descr=\"\$vnet_${action}_descr\"
-	printf "\t%s\n" "$descr"
+	printf "\t\t%s\n" "$descr"
 	exit $FAILURE
 }
 
@@ -511,10 +511,23 @@ vnet_list()
 	fi
 }
 
-vnet_delete_usage="delete NETWORK_NAME [iface0 ...]"
-vnet_delete_descr="Delete iface0 ... and/or NETWORK_NAME"
+vnet_delete_usage="delete [-k] NETWORK_NAME [iface0 ...]"
+vnet_delete_descr="Delete iface0 ... and/or NETWORK_NAME.
+		If no iface0 ... is left after deletion,
+		the network bridge {NETWORK_NAME}br and the host
+		interface {NETWORK_NANE} will also be deleted
+		unless -k (keep host interface) option is specified."
 vnet_delete()
 {
+	local OPTIND=1 OPTARG keephostif=0
+	while getopts 'k' flag; do
+		case "$flag" in
+		k) keephostif=1 ;;
+		*) action_usage delete # NOTREACHED
+		esac
+	done
+	shift $(( $OPTIND - 1 ))
+
 	local network="$1"
 	[ "${network:-x}" = "${network#*[!0-9a-zA-Z_]}" ] ||
 		action_usage delete # NOTREACHED
@@ -536,7 +549,9 @@ vnet_delete()
 
 	local hostiftype=$(get_nodetype $network)
 	if [ "$hostiftype" == "eiface" ]; then
-		vnet_eiface -d $network
+		if [ $keephostif == 0 ]; then
+			vnet_eiface -d $network
+		fi
 	elif [ "$hostiftype" == "ether" ]; then
 		if ! is_ether_being_used $network; then
 			ngctl rmhook $network: lower || return
