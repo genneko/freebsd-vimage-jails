@@ -435,7 +435,7 @@ vnet_list_jail()
 
 	mustberoot_to_continue
 
-	for jail in $(jls -s vnet name | fgrep vnet=1 | sed 's/.*name=//'); do
+	for jail in $(jls -s vnet name | grep "vnet=\(new\|1\)" | sed 's/.*name=//'); do
 		echo -n "$jail"
 		if [ "$long" -eq 1 ]; then
 			echo -n ": $(jexec $jail ifconfig -l)"
